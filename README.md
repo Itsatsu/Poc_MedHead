@@ -16,13 +16,13 @@ docs/       Specs et plans d'implémentation (docs/superpowers/)
 
 ### Prérequis
 
-- Java 21
+- Java 25 (LTS)
 - Maven
 
 Si `java`/`mvn` ne sont pas sur le `PATH` (ex. seul un JDK embarqué IntelliJ est disponible), exporter avant toute commande :
 
 ```bash
-export JAVA_HOME="<chemin vers un JDK 21>"
+export JAVA_HOME="<chemin vers un JDK 25>"
 export PATH="<chemin vers Maven>/bin:$JAVA_HOME/bin:$PATH"
 ```
 
@@ -42,7 +42,7 @@ mvn -B test -Dtest=NomDeLaClasseTest
 
 ## Pipeline CI/CD
 
-`.github/workflows/ci-backend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `backend/**`. Exécute `mvn -B verify` (JDK 21 Temurin) depuis `backend/`. Une PR ne peut pas être mergée si ce job échoue.
+`.github/workflows/ci-backend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `backend/**`. Exécute `mvn -B verify` (JDK 25 Temurin) depuis `backend/`. Une PR ne peut pas être mergée si ce job échoue.
 
 Le pipeline frontend (`.github/workflows/ci-frontend.yml`) sera renseigné à l'ouverture du chantier frontend.
 
