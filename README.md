@@ -84,6 +84,10 @@ mvn spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"
 
 Une fois lancée, l'API peut être testée avec la [collection Postman](postman/MedHead-PoC.postman_collection.json) fournie (variable `baseUrl`, par défaut `http://localhost:8080` — à adapter si un autre port est utilisé).
 
+### Tests de charge
+
+`backend/load-tests/` : plan JMeter validant l'exigence <200ms à 800 req/s sur `POST /api/bed-allocations`. Voir [`backend/load-tests/README.md`](backend/load-tests/README.md) pour le lancement et l'interprétation des résultats.
+
 ## Pipeline CI/CD
 
 `.github/workflows/ci-backend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `backend/**`. Exécute `mvn -B verify` (JDK 25 Temurin) depuis `backend/`. Une PR ne peut pas être mergée si ce job échoue.
