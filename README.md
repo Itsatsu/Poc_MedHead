@@ -8,7 +8,7 @@ Le détail fonctionnel, la conformité RGPD et l'architecture sont documentés d
 
 ```
 backend/    API Java / Spring Boot, architecture hexagonale (domain / infrastructure)
-frontend/   Interface React (à venir)
+frontend/   Interface React / TypeScript (Vite) qui consomme l'API
 docs/       Specs et plans d'implémentation (docs/superpowers/)
 ```
 
@@ -88,11 +88,52 @@ Une fois lancée, l'API peut être testée avec la [collection Postman](postman/
 
 `backend/load-tests/` : plan JMeter validant l'exigence <200ms à 800 req/s sur `POST /api/bed-allocations`. Voir [`backend/load-tests/README.md`](backend/load-tests/README.md) pour le lancement et l'interprétation des résultats.
 
+## Frontend
+
+### Prérequis
+
+- Node.js 22+ / npm
+
+### Exécuter les tests
+
+Depuis `frontend/` :
+
+```bash
+npm ci
+npm test
+```
+
+Tests de composant (Vitest + React Testing Library), `fetch` mocké — aucun appel réel au backend. Pour le lint et le build :
+
+```bash
+npm run lint
+npm run build
+```
+
+### Lancer l'application
+
+Le backend doit tourner (voir ci-dessus) et autoriser l'origine du frontend en CORS — configurable via `MEDHEAD_CORS_ALLOWED_ORIGINS` côté backend (défaut : `http://localhost:5173`, l'origine du serveur de dev Vite).
+
+Depuis `frontend/` :
+
+```bash
+npm ci
+npm run dev
+```
+
+Ouvre `http://localhost:5173`. Par défaut l'appli appelle l'API sur `http://localhost:8080` ; pour cibler un autre port (ex. si le 8080 est occupé), créer `frontend/.env.local` :
+
+```
+VITE_API_BASE_URL=http://localhost:8082
+```
+
 ## Pipeline CI/CD
 
-`.github/workflows/ci-backend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `backend/**`. Exécute `mvn -B verify` (JDK 25 Temurin) depuis `backend/`. Une PR ne peut pas être mergée si ce job échoue.
+`.github/workflows/ci-backend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `backend/**`. Exécute `mvn -B verify` (JDK 25 Temurin) depuis `backend/`.
 
-Le pipeline frontend (`.github/workflows/ci-frontend.yml`) sera renseigné à l'ouverture du chantier frontend.
+`.github/workflows/ci-frontend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `frontend/**`. Exécute `npm ci`, `npm run lint`, `npm test`, `npm run build` (Node 22) depuis `frontend/`.
+
+Une PR ne peut pas être mergée si l'un de ces jobs échoue.
 
 ## Workflow Git
 

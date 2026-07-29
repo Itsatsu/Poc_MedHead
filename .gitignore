@@ -28,3 +28,6 @@ replay_pid*
 
 # IDE
 .idea/
+
+# Playwright MCP local artifacts
+/.playwright-mcp/
