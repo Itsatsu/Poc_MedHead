@@ -1,0 +1,209 @@
+{
+	"info": {
+		"name": "MedHead PoC - Allocation de lits d'urgence",
+		"description": "Collection de test pour l'API REST d'allocation de lits (POST /api/bed-allocations). Basée sur le scénario de référence du document d'exigences : Hopital Fred Brooks (Cardiologie, Immunologie, 2 lits), Hopital Julia Crusher (Cardiologie, 0 lit), Hopital Beverly Bashir (Immunologie, Neuropathologie diagnostique, 5 lits).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Allocation confirmee - Cardiologie pres de Fred Brooks (200)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"latitude\": 48.8566,\n  \"longitude\": 2.3522,\n  \"specialty\": \"Cardiologie\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/bed-allocations",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "bed-allocations"]
+				},
+				"description": "Scenario de reference des exigences : doit renvoyer l'hopital Fred Brooks (le plus proche avec Cardiologie et un lit disponible), et publier un evenement de reservation cote serveur."
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"Status 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const body = pm.response.json();",
+							"",
+							"pm.test(\"Hopital propose = fred-brooks\", function () {",
+							"    pm.expect(body.hospital.id).to.eql(\"fred-brooks\");",
+							"});",
+							"",
+							"pm.test(\"distanceKm present\", function () {",
+							"    pm.expect(body.distanceKm).to.be.a(\"number\");",
+							"});",
+							"",
+							"pm.test(\"precision est 'reelle' ou 'estimee'\", function () {",
+							"    pm.expect([\"reelle\", \"estimee\"]).to.include(body.precision);",
+							"});"
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Specialite inconnue de la liste NHS (400)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"latitude\": 48.8566,\n  \"longitude\": 2.3522,\n  \"specialty\": \"Astrologie\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/bed-allocations",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "bed-allocations"]
+				},
+				"description": "'Astrologie' n'existe pas dans la liste de reference NHS des specialites -> 400 Bad Request."
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"Status 400\", function () {",
+							"    pm.response.to.have.status(400);",
+							"});"
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Coordonnees hors intervalle valide (400)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"latitude\": 999,\n  \"longitude\": 2.3522,\n  \"specialty\": \"Cardiologie\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/bed-allocations",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "bed-allocations"]
+				},
+				"description": "latitude doit etre dans [-90, 90] -> 400 Bad Request."
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"Status 400\", function () {",
+							"    pm.response.to.have.status(400);",
+							"});"
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Aucun hopital avec la specialite et un lit (404)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"latitude\": 48.8566,\n  \"longitude\": 2.3522,\n  \"specialty\": \"Neurochirurgie\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/bed-allocations",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "bed-allocations"]
+				},
+				"description": "Aucun des 3 hopitaux de la fixture PoC n'a la specialite Neurochirurgie -> 404 Not Found (NoHospitalAvailableException)."
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"Status 404\", function () {",
+							"    pm.response.to.have.status(404);",
+							"});"
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Julia Crusher a la specialite mais 0 lit -> Fred Brooks propose (200)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"latitude\": 48.8606,\n  \"longitude\": 2.3376,\n  \"specialty\": \"Cardiologie\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/bed-allocations",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "bed-allocations"]
+				},
+				"description": "Localisation au plus pres de Julia Crusher (Cardiologie mais 0 lit). Doit quand meme proposer Fred Brooks, seul hopital avec la specialite ET un lit disponible."
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"Status 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Hopital propose = fred-brooks (Julia Crusher exclu, 0 lit)\", function () {",
+							"    pm.expect(pm.response.json().hospital.id).to.eql(\"fred-brooks\");",
+							"});"
+						]
+					}
+				}
+			]
+		}
+	]
+}
