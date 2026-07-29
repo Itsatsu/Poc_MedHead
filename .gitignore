@@ -25,3 +25,6 @@ replay_pid*
 
 # Documents de cadrage non destines a etre versionnes
 /ne pas git/
+
+# IDE
+.idea/
