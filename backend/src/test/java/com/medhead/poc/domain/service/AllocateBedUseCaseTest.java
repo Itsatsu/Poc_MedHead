@@ -3,6 +3,7 @@ package com.medhead.poc.domain.service;
 import com.medhead.poc.domain.model.BedAllocationRequest;
 import com.medhead.poc.domain.model.BedAllocationResult;
 import com.medhead.poc.domain.model.BedReservationEvent;
+import com.medhead.poc.domain.model.Distance;
 import com.medhead.poc.domain.model.Hospital;
 import com.medhead.poc.domain.port.DistanceCalculator;
 import com.medhead.poc.domain.port.EventPublisher;
@@ -109,8 +110,8 @@ class AllocateBedUseCaseTest {
         }
 
         @Override
-        public double distanceKm(double lat1, double lon1, double lat2, double lon2) {
-            return distances.getOrDefault(key(lat2, lon2), Double.MAX_VALUE);
+        public Distance distanceTo(double lat1, double lon1, double lat2, double lon2) {
+            return new Distance(distances.getOrDefault(key(lat2, lon2), Double.MAX_VALUE), "estimee");
         }
 
         private static String key(double lat, double lon) {

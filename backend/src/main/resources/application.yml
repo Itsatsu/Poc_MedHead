@@ -1,3 +1,11 @@
 spring:
   application:
     name: allocation-lits
+
+medhead:
+  distance:
+    google-maps:
+      api-key: ${GOOGLE_MAPS_API_KEY:}
+    circuit-breaker:
+      failure-threshold: 3
+      open-duration-seconds: 30

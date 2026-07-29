@@ -3,6 +3,7 @@ package com.medhead.poc.domain.service;
 import com.medhead.poc.domain.model.BedAllocationRequest;
 import com.medhead.poc.domain.model.BedAllocationResult;
 import com.medhead.poc.domain.model.BedReservationEvent;
+import com.medhead.poc.domain.model.Distance;
 import com.medhead.poc.domain.model.Hospital;
 import com.medhead.poc.domain.model.NhsSpecialty;
 import com.medhead.poc.domain.port.DistanceCalculator;
@@ -58,13 +59,16 @@ public class AllocateBedUseCase {
     }
 
     private Optional<Hospital> nearest(Stream<Hospital> hospitals, BedAllocationRequest request) {
-        return hospitals.min(Comparator.comparingDouble(h -> distanceCalculator.distanceKm(
-                request.latitude(), request.longitude(), h.latitude(), h.longitude())));
+        return hospitals.min(Comparator.comparingDouble(h -> distanceTo(h, request).km()));
     }
 
     private BedAllocationResult toResult(Hospital hospital, BedAllocationRequest request) {
-        double distanceKm = distanceCalculator.distanceKm(
+        Distance distance = distanceTo(hospital, request);
+        return new BedAllocationResult(hospital, distance.precision(), distance.km());
+    }
+
+    private Distance distanceTo(Hospital hospital, BedAllocationRequest request) {
+        return distanceCalculator.distanceTo(
                 request.latitude(), request.longitude(), hospital.latitude(), hospital.longitude());
-        return new BedAllocationResult(hospital, "estimee", distanceKm);
     }
 }

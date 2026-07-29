@@ -1,15 +1,14 @@
 package com.medhead.poc.infrastructure.adapter.out.distance;
 
+import com.medhead.poc.domain.model.Distance;
 import com.medhead.poc.domain.port.DistanceCalculator;
-import org.springframework.stereotype.Component;
 
-@Component
 public class HaversineDistanceCalculator implements DistanceCalculator {
 
     private static final double EARTH_RADIUS_KM = 6371.0;
 
     @Override
-    public double distanceKm(double lat1, double lon1, double lat2, double lon2) {
+    public Distance distanceTo(double lat1, double lon1, double lat2, double lon2) {
         double lat1Rad = Math.toRadians(lat1);
         double lat2Rad = Math.toRadians(lat2);
         double deltaLat = Math.toRadians(lat2 - lat1);
@@ -20,6 +19,6 @@ public class HaversineDistanceCalculator implements DistanceCalculator {
                 * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
         double c = 2 * Math.asin(Math.sqrt(a));
 
-        return EARTH_RADIUS_KM * c;
+        return new Distance(EARTH_RADIUS_KM * c, "estimee");
     }
 }
