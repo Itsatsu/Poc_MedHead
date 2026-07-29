@@ -26,6 +26,20 @@ export JAVA_HOME="<chemin vers un JDK 25>"
 export PATH="<chemin vers Maven>/bin:$JAVA_HOME/bin:$PATH"
 ```
 
+PowerShell (Windows) :
+
+```powershell
+$env:JAVA_HOME = "<chemin vers un JDK 25>"
+$env:PATH = "<chemin vers Maven>\bin;$env:JAVA_HOME\bin;$env:PATH"
+```
+
+Exemple avec le JDK/Maven embarqués dans IntelliJ IDEA :
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\JetBrains\IntelliJ IDEA 2026.1.4\jbr"
+$env:PATH = "C:\Program Files\JetBrains\IntelliJ IDEA 2026.1.4\plugins\maven\lib\maven3\bin;$env:JAVA_HOME\bin;$env:PATH"
+```
+
 ### Exécuter les tests
 
 Depuis `backend/` :
@@ -34,11 +48,41 @@ Depuis `backend/` :
 mvn -B verify
 ```
 
-Lance l'ensemble de la suite (tests unitaires du domaine sans contexte Spring + tests d'intégration Spring) et produit le jar. Pour cibler une classe de test précise :
+Lance l'ensemble de la suite (tests unitaires du domaine sans contexte Spring + tests d'intégration Spring) et produit le jar. Les tests n'appellent jamais Google Maps réellement (voir ci-dessous) : ils utilisent une implémentation en mémoire du calcul de distance. Pour cibler une classe de test précise :
 
 ```bash
 mvn -B test -Dtest=NomDeLaClasseTest
 ```
+
+### Lancer l'application
+
+Depuis `backend/`, une fois `JAVA_HOME`/`PATH` positionnés comme ci-dessus :
+
+```bash
+mvn spring-boot:run
+```
+
+L'API écoute sur `http://localhost:8080`. Le calcul de distance réelle (Google Maps Routes API) nécessite une clé API, sinon le service bascule automatiquement sur une estimation à vol d'oiseau (`precision: "estimee"`, voir `info.md` section 3) :
+
+```powershell
+$env:GOOGLE_MAPS_API_KEY = "<votre clé>"
+mvn spring-boot:run
+```
+
+**Ne jamais commiter cette clé.** Elle n'est lue que via la variable d'environnement (`application.yml` référence `${GOOGLE_MAPS_API_KEY:}`).
+
+Si le port 8080 est déjà occupé :
+
+```powershell
+# Identifier puis arrêter le processus qui l'occupe
+Get-NetTCPConnection -LocalPort 8080 -State Listen | Select-Object OwningProcess
+Stop-Process -Id <PID_trouvé> -Force
+
+# ou démarrer sur un autre port
+mvn spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"
+```
+
+Une fois lancée, l'API peut être testée avec la [collection Postman](postman/MedHead-PoC.postman_collection.json) fournie (variable `baseUrl`, par défaut `http://localhost:8080` — à adapter si un autre port est utilisé).
 
 ## Pipeline CI/CD
 
