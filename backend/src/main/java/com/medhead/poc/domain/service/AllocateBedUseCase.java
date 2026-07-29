@@ -1,6 +1,5 @@
 package com.medhead.poc.domain.service;
 
-import com.medhead.poc.domain.model.AllocationStatus;
 import com.medhead.poc.domain.model.BedAllocationRequest;
 import com.medhead.poc.domain.model.BedAllocationResult;
 import com.medhead.poc.domain.model.BedReservationEvent;
@@ -43,25 +42,15 @@ public class AllocateBedUseCase {
 
         List<Hospital> hospitals = hospitalRepository.findAll();
 
-        Optional<Hospital> confirmed = nearest(hospitals.stream()
+        Hospital hospital = nearest(hospitals.stream()
                 .filter(h -> hasSpecialty(h, request.specialty()))
-                .filter(h -> h.availableBeds() > 0), request);
-        if (confirmed.isPresent()) {
-            Hospital hospital = confirmed.get();
-            eventPublisher.publish(new BedReservationEvent(
-                    UUID.randomUUID(), hospital.id(), request.specialty(), Instant.now()));
-            return toResult(hospital, AllocationStatus.CONFIRMED, request);
-        }
+                .filter(h -> h.availableBeds() > 0), request)
+                .orElseThrow(() -> new NoHospitalAvailableException(
+                        "No hospital with an available bed and specialty: " + request.specialty()));
 
-        Optional<Hospital> specialtyOnly = nearest(hospitals.stream()
-                .filter(h -> hasSpecialty(h, request.specialty())), request);
-        if (specialtyOnly.isPresent()) {
-            return toResult(specialtyOnly.get(), AllocationStatus.BED_NOT_CONFIRMED, request);
-        }
-
-        Hospital anyHospital = nearest(hospitals.stream(), request)
-                .orElseThrow(() -> new IllegalStateException("No hospital available"));
-        return toResult(anyHospital, AllocationStatus.SPECIALTY_NOT_AVAILABLE, request);
+        eventPublisher.publish(new BedReservationEvent(
+                UUID.randomUUID(), hospital.id(), request.specialty(), Instant.now()));
+        return toResult(hospital, request);
     }
 
     private boolean hasSpecialty(Hospital hospital, String specialty) {
@@ -73,10 +62,9 @@ public class AllocateBedUseCase {
                 request.latitude(), request.longitude(), h.latitude(), h.longitude())));
     }
 
-    private BedAllocationResult toResult(Hospital hospital, AllocationStatus status,
-                                          BedAllocationRequest request) {
+    private BedAllocationResult toResult(Hospital hospital, BedAllocationRequest request) {
         double distanceKm = distanceCalculator.distanceKm(
                 request.latitude(), request.longitude(), hospital.latitude(), hospital.longitude());
-        return new BedAllocationResult(hospital, status, "estimee", distanceKm);
+        return new BedAllocationResult(hospital, "estimee", distanceKm);
     }
 }

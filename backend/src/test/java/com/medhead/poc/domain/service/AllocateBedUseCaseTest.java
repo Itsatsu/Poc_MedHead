@@ -1,6 +1,5 @@
 package com.medhead.poc.domain.service;
 
-import com.medhead.poc.domain.model.AllocationStatus;
 import com.medhead.poc.domain.model.BedAllocationRequest;
 import com.medhead.poc.domain.model.BedAllocationResult;
 import com.medhead.poc.domain.model.BedReservationEvent;
@@ -44,41 +43,36 @@ class AllocateBedUseCaseTest {
                 new BedAllocationRequest(48.85, 2.35, "Cardiologie"));
 
         assertThat(result.hospital()).isEqualTo(NEAR_HOSPITAL_WITH_BED);
-        assertThat(result.allocationStatus()).isEqualTo(AllocationStatus.CONFIRMED);
         assertThat(result.precision()).isEqualTo("estimee");
         assertThat(result.distanceKm()).isEqualTo(1.0);
         assertThat(events.getPublishedEvents()).hasSize(1);
     }
 
     @Test
-    void returnsBedNotConfirmedWhenSpecialtyHasNoAvailableBed() {
+    void throwsWhenSpecialtyHasNoAvailableBed() {
         StubHospitalRepository repository = new StubHospitalRepository(List.of(NEAR_HOSPITAL_NO_BED));
         StubDistanceCalculator distances = new StubDistanceCalculator();
         distances.distanceTo(NEAR_HOSPITAL_NO_BED, 2.0);
         RecordingEventPublisher events = new RecordingEventPublisher();
         AllocateBedUseCase useCase = new AllocateBedUseCase(repository, distances, events);
 
-        BedAllocationResult result = useCase.allocate(
-                new BedAllocationRequest(48.86, 2.34, "Cardiologie"));
-
-        assertThat(result.hospital()).isEqualTo(NEAR_HOSPITAL_NO_BED);
-        assertThat(result.allocationStatus()).isEqualTo(AllocationStatus.BED_NOT_CONFIRMED);
+        assertThatThrownBy(() -> useCase.allocate(
+                new BedAllocationRequest(48.86, 2.34, "Cardiologie")))
+                .isInstanceOf(NoHospitalAvailableException.class);
         assertThat(events.getPublishedEvents()).isEmpty();
     }
 
     @Test
-    void returnsSpecialtyNotAvailableWhenNoHospitalHasSpecialty() {
+    void throwsWhenNoHospitalHasSpecialty() {
         StubHospitalRepository repository = new StubHospitalRepository(List.of(HOSPITAL_OTHER_SPECIALTY));
         StubDistanceCalculator distances = new StubDistanceCalculator();
         distances.distanceTo(HOSPITAL_OTHER_SPECIALTY, 3.0);
         RecordingEventPublisher events = new RecordingEventPublisher();
         AllocateBedUseCase useCase = new AllocateBedUseCase(repository, distances, events);
 
-        BedAllocationResult result = useCase.allocate(
-                new BedAllocationRequest(48.87, 2.30, "Cardiologie"));
-
-        assertThat(result.hospital()).isEqualTo(HOSPITAL_OTHER_SPECIALTY);
-        assertThat(result.allocationStatus()).isEqualTo(AllocationStatus.SPECIALTY_NOT_AVAILABLE);
+        assertThatThrownBy(() -> useCase.allocate(
+                new BedAllocationRequest(48.87, 2.30, "Cardiologie")))
+                .isInstanceOf(NoHospitalAvailableException.class);
         assertThat(events.getPublishedEvents()).isEmpty();
     }
 

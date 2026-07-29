@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Exposer `POST /api/bed-allocations` qui reçoit localisation + spécialité, détermine l'hôpital le plus proche pertinent via un algorithme en 3 paliers dégradés, et publie un `BedReservationEvent` (port `EventPublisher` existant) uniquement quand un lit est confirmé.
+**Goal:** Exposer `POST /api/bed-allocations` qui reçoit localisation + spécialité, détermine l'hôpital le plus proche ayant la spécialité et un lit disponible, et publie un `BedReservationEvent` (port `EventPublisher` existant).
+
+> **Mise à jour post-Task 5 :** le design initial (3 paliers dégradés : `CONFIRMED` / `BED_NOT_CONFIRMED` / `SPECIALTY_NOT_AVAILABLE`) a été simplifié après revue — les paliers 2 et 3 n'étaient pas demandés par le document d'exigences et ont été retirés (`AllocationStatus` supprimé, `NoHospitalAvailableException` ajoutée à la place, → `404`). Voir `docs/superpowers/specs/2026-07-17-endpoint-allocation-lit-design.md` pour la justification. Les extraits de code des tâches ci-dessous montrent encore l'ancien design pour les tâches déjà commitées (2, 5) ; se référer au code réel du repo, pas à ces extraits.
 
 **Architecture:** Extension du package hexagonal existant `com.medhead.poc` (Spring Boot 4.1.0, Java 25) : nouveaux types de domaine purs (`domain/model`, `domain/port`, `domain/service`) et nouveaux adaptateurs (`infrastructure/adapter/out/hospital`, `infrastructure/adapter/out/distance`, `infrastructure/adapter/in/web`, `infrastructure/config`).
 
@@ -14,7 +16,7 @@
 - La spécialité d'une requête doit toujours être validée contre `NhsSpecialty.VALID_SPECIALTIES` (comparaison insensible à la casse) — jamais acceptée en texte libre.
 - La distance exposée est en kilomètres (`distanceKm`), jamais convertie en un temps de trajet fabriqué.
 - Chaque résultat porte `precision = "estimee"` (calcul à vol d'oiseau, pas de service de routing réel dans cette PoC).
-- Les 3 paliers métier renvoient toujours `200` avec une proposition d'hôpital — jamais `404` (Principe A4 : ne jamais laisser le patient sans rien). Seule une requête structurellement invalide (spécialité inconnue, coordonnées manquantes/hors intervalle) renvoie `400`.
+- Le cas confirmé (spécialité + lit disponible) renvoie `200`. Une requête structurellement invalide (spécialité inconnue, coordonnées manquantes/hors intervalle) renvoie `400`. Aucun hôpital ne correspondant renvoie `404` (`NoHospitalAvailableException`) — jamais de proposition d'hôpital sans la spécialité ou sans lit.
 - Aucun skill de normes dédié Java/Spring n'existe dans ce repo. Suivre les conventions Spring Boot standard.
 - Commande qualité de référence (à exécuter depuis `backend/` à chaque tâche) : `mvn -B verify`.
 - Environnement de build local : ni `mvn` ni `java` ne sont sur le `PATH` de la machine. Utiliser le JDK et Maven fournis avec IntelliJ IDEA :
@@ -982,7 +984,6 @@ class BedAllocationControllerTest {
                         .content(requestBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hospital.id", is("fred-brooks")))
-                .andExpect(jsonPath("$.allocationStatus", is("CONFIRMED")))
                 .andExpect(jsonPath("$.precision", is("estimee")));
     }
 
@@ -995,6 +996,17 @@ class BedAllocationControllerTest {
                         .contentType(APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returns404WhenNoHospitalHasSpecialtyWithAvailableBed() throws Exception {
+        String requestBody = objectMapper.writeValueAsString(
+                new BedAllocationRequestDto(48.8566, 2.3522, "Neurochirurgie"));
+
+        mockMvc.perform(post("/api/bed-allocations")
+                        .contentType(APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isNotFound());
     }
 }
 ```
@@ -1022,8 +1034,7 @@ Créer `backend/src/main/java/com/medhead/poc/infrastructure/adapter/in/web/BedA
 ```java
 package com.medhead.poc.infrastructure.adapter.in.web;
 
-public record BedAllocationResponseDto(HospitalDto hospital, String allocationStatus,
-                                        String precision, double distanceKm) {
+public record BedAllocationResponseDto(HospitalDto hospital, String precision, double distanceKm) {
 
     public record HospitalDto(String id, String name) {
     }
@@ -1041,6 +1052,7 @@ import com.medhead.poc.domain.model.BedAllocationRequest;
 import com.medhead.poc.domain.model.BedAllocationResult;
 import com.medhead.poc.domain.service.AllocateBedUseCase;
 import com.medhead.poc.domain.service.InvalidBedAllocationRequestException;
+import com.medhead.poc.domain.service.NoHospitalAvailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -1074,10 +1086,14 @@ public class BedAllocationController {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
     }
 
+    @ExceptionHandler(NoHospitalAvailableException.class)
+    public ResponseEntity<String> handleNoHospitalAvailable(NoHospitalAvailableException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(exception.getMessage());
+    }
+
     private BedAllocationResponseDto toDto(BedAllocationResult result) {
         return new BedAllocationResponseDto(
                 new BedAllocationResponseDto.HospitalDto(result.hospital().id(), result.hospital().name()),
-                result.allocationStatus().name(),
                 result.precision(),
                 result.distanceKm());
     }
@@ -1101,19 +1117,19 @@ git add backend/src/main/java/com/medhead/poc/infrastructure/adapter/in/web/BedA
 git commit -m "feat: add POST /api/bed-allocations endpoint"
 ```
 
-**Done criterion:** `mvn -B verify` passe entièrement ; le scénario du document d'exigences (Cardiologie près de Fred Brooks → Fred Brooks, `CONFIRMED`) est couvert par un test automatisé qui passe.
+**Done criterion:** `mvn -B verify` passe entièrement ; le scénario du document d'exigences (Cardiologie près de Fred Brooks → Fred Brooks) est couvert par un test automatisé qui passe.
 
 ---
 
 ## Spec Coverage Check
 
-- Modèle de domaine (`Hospital`, `NhsSpecialty`, `BedAllocationRequest`, `AllocationStatus`, `BedAllocationResult`) → Task 2, 3.
+- Modèle de domaine (`Hospital`, `NhsSpecialty`, `BedAllocationRequest`, `BedAllocationResult`) → Task 2, 3.
 - Ports (`HospitalRepository`, `DistanceCalculator`) → Task 4.
-- `AllocateBedUseCase` (algorithme 3 paliers, événement uniquement sur `CONFIRMED`) → Task 5.
+- `AllocateBedUseCase` (hôpital le plus proche avec spécialité + lit, événement publié uniquement si trouvé, sinon `NoHospitalAvailableException`) → Task 5.
 - Adaptateurs (`InMemoryHospitalRepository`, `HaversineDistanceCalculator`) → Task 6, 7.
 - Câblage Spring → Task 8.
-- Contrôleur REST + validation 400 → Task 9.
+- Contrôleur REST + validation 400 + 404 → Task 9.
 - Contrainte "domain sans dépendance Spring" → Tasks 2, 3, 4, 5 (aucun import Spring dans les fichiers produits).
 - `precision: "estimee"` sur toute réponse → Task 5 (`toResult`), vérifié en Task 9.
-- Jamais de 404 sur les 3 paliers métier → Task 5 (toujours un `BedAllocationResult`), Task 9 (le contrôleur ne mappe que les erreurs de validation en 400).
+- Aucun hôpital sans la spécialité ou sans lit n'est jamais proposé comme résultat → Task 5 (`NoHospitalAvailableException`), Task 9 (mappée en `404`).
 - Hors scope (distance réelle, circuit breaker, cache, frontend, persistance) : non traité, conforme au design.

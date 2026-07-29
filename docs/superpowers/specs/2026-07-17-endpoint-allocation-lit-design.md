@@ -16,9 +16,9 @@ Backend existant : Spring Boot 4.1.0, Java 25, package hexagonal `com.medhead.po
 - **Unité exposée : kilomètres, pas un temps de trajet.** info.md distingue explicitement la distance réelle ("temps de trajet", cible future) du fallback à vol d'oiseau. Convertir la distance en un "temps estimé" via une vitesse moyenne arbitraire fabriquerait une donnée qui semble fiable alors qu'elle ne l'est pas — contraire au Principe A4. Le champ exposé est donc `distanceKm`, jamais une durée.
 - **Format de la localisation** : latitude/longitude numériques. Aucun document n'impose de format ; le géocodage d'adresse est un sous-système hors scope. Pas de recommandation contraire des exigences (elles demandent seulement "une simple page ... pour saisir la localisation", sans préciser le format).
 - **Validation de la spécialité** : contre la liste de référence NHS (`Données de référence sur les spécialités NHS.pdf`), qui l'impose explicitement : *"À utiliser pour les fonctionnalités qui permettent de sélectionner les hôpitaux par spécialité. Les fonctionnalités doivent être ciblées en fonction de ces données."* Pas de texte libre.
-- **Gestion des cas sans correspondance parfaite** : jamais de réponse vide (Principe A4 — "d'abord ne pas nuire, ensuite soigner" implique de ne jamais laisser le patient sans proposition). Recherche en 3 paliers dégradés (voir Algorithme).
+- **Gestion des cas sans correspondance** : les exigences ne décrivent qu'un seul cas métier — l'hôpital le plus proche avec la spécialité **et** un lit disponible. Aucune recherche dégradée (proposer un hôpital sans lit ou sans la spécialité) n'est demandée ; en inventer une reviendrait à ajouter une fonctionnalité hors périmètre, potentiellement dangereuse (suggérer un hôpital incapable de traiter le patient). Une version antérieure de cette spec justifiait un repli en 3 paliers par le Principe A4 ("d'abord ne pas nuire") — relecture du texte du principe : il ne prescrit pas ce comportement précis, c'était une extrapolation. Quand aucun hôpital n'a la spécialité et un lit disponible, le cas est traité comme une absence de résultat (`NoHospitalAvailableException`), pas comme une proposition dégradée.
 - **Route HTTP** : `POST /api/bed-allocations` — sémantique REST de création d'une proposition d'allocation, cohérente avec l'effet de bord (publication d'événement) qu'un `GET` ne devrait pas avoir.
-- **Statuts HTTP** : `200` sur les 3 paliers métier (jamais `404` — un résultat métier dégradé n'est pas une erreur technique), `400` uniquement pour une requête invalide (spécialité inconnue de la liste NHS, coordonnées manquantes).
+- **Statuts HTTP** : `200` sur le cas confirmé, `400` pour une requête invalide (spécialité inconnue de la liste NHS, coordonnées manquantes/hors intervalle), `404` quand aucun hôpital n'a la spécialité avec un lit disponible.
 
 ## Architecture
 
@@ -29,7 +29,6 @@ backend/src/main/java/com/medhead/poc/
       Hospital.java                 (record, immuable)
       NhsSpecialty.java             (liste de référence, cf. section dédiée)
       BedAllocationRequest.java     (record)
-      AllocationStatus.java         (enum)
       BedAllocationResult.java      (record)
     port/
       HospitalRepository.java       (interface)
@@ -55,8 +54,8 @@ Contrainte identique à la story précédente : `domain/` ne dépend d'aucune cl
 
 - `Hospital(String id, String name, Set<String> specialties, int availableBeds, double latitude, double longitude)`
 - `BedAllocationRequest(double latitude, double longitude, String specialty)`
-- `AllocationStatus` : enum `CONFIRMED`, `BED_NOT_CONFIRMED`, `SPECIALTY_NOT_AVAILABLE`
-- `BedAllocationResult(Hospital hospital, AllocationStatus allocationStatus, String precision, double distanceKm)`
+- `BedAllocationResult(Hospital hospital, String precision, double distanceKm)`
+- `NoHospitalAvailableException` : levée quand aucun hôpital n'a la spécialité avec un lit disponible (→ 404 au niveau du contrôleur)
 
 ## Liste de référence NHS (`NhsSpecialty`)
 
@@ -103,12 +102,11 @@ Note de mapping : les exigences citent "immunologie, neuropathologie, diagnostic
 
 ## Algorithme métier (`AllocateBedUseCase.allocate(BedAllocationRequest)`)
 
-1. Valider `specialty` contre `NhsSpecialty` → sinon exception de validation (→ 400 au niveau du contrôleur).
+1. Valider `specialty` contre `NhsSpecialty` → sinon `InvalidBedAllocationRequestException` (→ 400 au niveau du contrôleur).
 2. Charger tous les hôpitaux via `HospitalRepository.findAll()`.
-3. **Palier 1** : parmi les hôpitaux ayant la spécialité ET `availableBeds > 0`, prendre celui avec la plus petite `DistanceCalculator.distanceKm(...)`. Si trouvé → `AllocationStatus.CONFIRMED`, publier un `BedReservationEvent` via `EventPublisher`, retourner le résultat.
-4. **Palier 2** : sinon, parmi les hôpitaux ayant la spécialité (lits ou non), prendre le plus proche. Si trouvé → `AllocationStatus.BED_NOT_CONFIRMED`, pas d'événement publié.
-5. **Palier 3** : sinon (aucun hôpital n'a la spécialité), prendre l'hôpital le plus proche parmi tous. → `AllocationStatus.SPECIALTY_NOT_AVAILABLE`, pas d'événement publié.
-6. Chaque résultat porte `precision = "estimee"` et le `distanceKm` calculé.
+3. Parmi les hôpitaux ayant la spécialité ET `availableBeds > 0`, prendre celui avec la plus petite `DistanceCalculator.distanceKm(...)`.
+4. Si trouvé → publier un `BedReservationEvent` via `EventPublisher`, retourner le résultat (`precision = "estimee"`, `distanceKm` calculé).
+5. Sinon → `NoHospitalAvailableException` (→ 404 au niveau du contrôleur), aucun événement publié.
 
 (Le cas où `HospitalRepository.findAll()` est vide n'est pas géré explicitement : la fixture PoC contient toujours 3 hôpitaux, ce cas ne peut pas se produire dans le scope de cette story.)
 
@@ -121,11 +119,10 @@ Requête :
 { "latitude": 48.858, "longitude": 2.294, "specialty": "Cardiologie" }
 ```
 
-Réponse `200` (structure identique sur les 3 paliers, seul `allocationStatus` change) :
+Réponse `200` :
 ```json
 {
   "hospital": { "id": "fred-brooks", "name": "Hopital Fred Brooks" },
-  "allocationStatus": "CONFIRMED",
   "precision": "estimee",
   "distanceKm": 3.2
 }
@@ -133,17 +130,20 @@ Réponse `200` (structure identique sur les 3 paliers, seul `allocationStatus` c
 
 Réponse `400` si `specialty` absent de la liste NHS, ou `latitude`/`longitude` absents ou hors intervalle valide (`latitude` ∈ [-90, 90], `longitude` ∈ [-180, 180]).
 
+Réponse `404` si aucun hôpital n'a la spécialité demandée avec un lit disponible.
+
 ## Tests
 
-- `AllocateBedUseCase` : un test par palier (CONFIRMED / BED_NOT_CONFIRMED / SPECIALTY_NOT_AVAILABLE), avec un `HospitalRepository` et un `EventPublisher` de test (implémentations en mémoire dédiées au test, pas de mock framework nécessaire vu la simplicité des interfaces). Vérifier explicitement que l'événement n'est publié que dans le cas CONFIRMED.
+- `AllocateBedUseCase` : cas confirmé (hôpital le plus proche avec spécialité + lit, événement publié), cas sans lit disponible (`NoHospitalAvailableException`), cas sans hôpital ayant la spécialité (`NoHospitalAvailableException`) — avec un `HospitalRepository` et un `EventPublisher` de test (implémentations en mémoire dédiées au test, pas de mock framework nécessaire vu la simplicité des interfaces). Vérifier explicitement qu'aucun événement n'est publié dans les cas d'échec.
 - `HaversineDistanceCalculator` : test unitaire avec des coordonnées connues (distance attendue calculable à la main ou via une référence externe).
 - `NhsSpecialty` / validation : test qui vérifie qu'une spécialité hors liste est rejetée et qu'une spécialité valide passe (insensible à la casse).
-- Test d'intégration `@SpringBootTest` + `MockMvc` sur `BedAllocationController` : golden path (scénario Fred Brooks du document d'exigences) et cas de requête invalide (400).
+- Test d'intégration `@SpringBootTest` + `MockMvc` sur `BedAllocationController` : golden path (scénario Fred Brooks du document d'exigences), cas de requête invalide (400), cas sans hôpital disponible (404).
 
 ## Hors scope de cette story
 
 - Calcul de distance réelle (routing externe), circuit breaker, cache des positions.
 - Fallback multi-fournisseur.
+- Recherche dégradée (proposer un hôpital sans lit ou sans la spécialité demandée) — non demandé par les exigences, écarté volontairement (voir "Décisions actées").
 - Frontend React.
 - Persistance des hôpitaux en base de données.
 
@@ -153,4 +153,4 @@ Réponse `400` si `specialty` absent de la liste NHS, ou `latitude`/`longitude` 
 - Le scénario du document d'exigences (patient cardiologie près de Fred Brooks → Fred Brooks proposé, événement publié) est couvert par un test automatisé.
 - Aucune classe de `domain/` n'importe `org.springframework.*`.
 - `specialty` toujours validé contre `NhsSpecialty`, jamais accepté en texte libre.
-- Aucune réponse vide/404 sur les 3 paliers métier — toujours une proposition d'hôpital.
+- Aucun hôpital sans la spécialité ou sans lit disponible n'est jamais proposé comme résultat.
