@@ -1,1 +1,3 @@
 target/
+load-tests/results.jtl
+load-tests/report/

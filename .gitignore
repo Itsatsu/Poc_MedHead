@@ -25,3 +25,9 @@ replay_pid*
 
 # Documents de cadrage non destines a etre versionnes
 /ne pas git/
+
+# IDE
+.idea/
+
+# Playwright MCP local artifacts
+/.playwright-mcp/
