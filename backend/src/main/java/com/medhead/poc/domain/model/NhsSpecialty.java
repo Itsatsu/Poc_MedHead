@@ -2,8 +2,15 @@ package com.medhead.poc.domain.model;
 
 import java.util.Set;
 
+/**
+ * Référentiel des spécialités médicales reconnues par le NHS. Sert à valider
+ * qu'une demande d'allocation porte sur une spécialité connue et à faire
+ * correspondre les spécialités déclarées par les hôpitaux.
+ */
 public final class NhsSpecialty {
 
+    // Liste fermée des libellés NHS valides ; toute spécialité absente de cet
+    // ensemble est rejetée par AllocateBedUseCase avant même de chercher un hôpital.
     public static final Set<String> VALID_SPECIALTIES = Set.of(
             "Anesthésie", "Soins intensifs", "Oncologie clinique",
             "Spécialités dentaires supplémentaires", "Radiologie dentaire et maxillo-faciale",
@@ -41,6 +48,8 @@ public final class NhsSpecialty {
         if (specialty == null) {
             return false;
         }
+        // Comparaison insensible à la casse : les clients externes ne sont pas
+        // garantis de respecter exactement la casse du référentiel NHS.
         return VALID_SPECIALTIES.stream().anyMatch(valid -> valid.equalsIgnoreCase(specialty));
     }
 }

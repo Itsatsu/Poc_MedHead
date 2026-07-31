@@ -3,6 +3,13 @@ package com.medhead.poc.infrastructure.adapter.out.distance;
 import com.medhead.poc.domain.model.Distance;
 import com.medhead.poc.domain.port.DistanceCalculator;
 
+/**
+ * Adaptateur de sortie (hexagonal) calculant une distance "à vol d'oiseau" via la
+ * formule de Haversine, sans dépendance externe. Sert de calculateur de secours
+ * ({@link ResilientDistanceCalculator}) quand Google Maps est indisponible : moins
+ * précis (ignore le réseau routier réel) mais toujours disponible et quasi instantané,
+ * ce qui garantit l'exigence de latence même en cas de panne du service externe.
+ */
 public class HaversineDistanceCalculator implements DistanceCalculator {
 
     private static final double EARTH_RADIUS_KM = 6371.0;

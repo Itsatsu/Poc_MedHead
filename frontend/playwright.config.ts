@@ -5,6 +5,8 @@ const BACKEND_PORT = process.env.BACKEND_PORT ?? '8080';
 
 export default defineConfig({
   testDir: './e2e',
+  // Désactivé : les tests partagent le même backend/hôpitaux en mémoire, un run
+  // en parallèle rendrait les assertions sur les lits disponibles non fiables.
   fullyParallel: false,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],

@@ -4,6 +4,10 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Événement métier émis lorsqu'un lit est réservé suite à une allocation réussie.
+ * Publié via le port {@link com.medhead.poc.domain.port.EventPublisher}.
+ */
 public record BedReservationEvent(UUID id, String hospitalId, String specialty, Instant reservedAt) {
 
     public BedReservationEvent {

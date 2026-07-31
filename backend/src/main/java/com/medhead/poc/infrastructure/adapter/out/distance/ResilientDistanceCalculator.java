@@ -5,6 +5,13 @@ import com.medhead.poc.domain.port.DistanceCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Adaptateur de sortie (hexagonal) combinant un calculateur primaire (typiquement
+ * {@link GoogleMapsDistanceCalculator}) et un calculateur de secours (typiquement
+ * {@link HaversineDistanceCalculator}) derrière un {@link CircuitBreaker}. C'est
+ * l'implémentation de {@link DistanceCalculator} réellement injectée dans le domaine ;
+ * ce dernier ignore totalement l'existence de Google Maps ou du disjoncteur.
+ */
 public class ResilientDistanceCalculator implements DistanceCalculator {
 
     private static final Logger log = LoggerFactory.getLogger(ResilientDistanceCalculator.class);
@@ -28,11 +35,15 @@ public class ResilientDistanceCalculator implements DistanceCalculator {
                 circuitBreaker.recordSuccess();
                 return distance;
             } catch (RuntimeException e) {
+                // On capture toute RuntimeException (pas seulement DistanceCalculationException)
+                // pour rester résilient face à des erreurs inattendues du calculateur primaire.
                 circuitBreaker.recordFailure();
                 log.warn("Primary distance calculator failed, falling back to estimated distance: {}",
                         e.getMessage(), e);
             }
         } else {
+            // Circuit ouvert : on ne tente même pas le primaire, pour ne pas payer sa
+            // latence/coût pendant qu'il est présumé en panne.
             log.warn("Circuit breaker is open, using estimated distance without calling the primary calculator");
         }
         return fallback.distanceTo(lat1, lon1, lat2, lon2);

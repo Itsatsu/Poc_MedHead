@@ -7,6 +7,12 @@ import com.medhead.poc.domain.service.AllocateBedUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Câble le cas d'usage du domaine {@link AllocateBedUseCase} avec les adaptateurs
+ * Spring (ports en entrée du cas d'usage). Cette classe est la frontière explicite
+ * entre le domaine (pur, sans annotation Spring) et le conteneur d'injection de
+ * dépendances.
+ */
 @Configuration
 public class UseCaseConfiguration {
 

@@ -1,32 +1,23 @@
-# React + TypeScript + Vite
+# Frontend — MedHead PoC
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Interface React 19 / TypeScript (Vite) pour l'allocation de lits d'urgence. Consomme l'API backend (`POST /api/bed-allocations`).
 
-Currently, two official plugins are available:
+Pour les prérequis, les commandes de build/test complètes et le fonctionnement d'ensemble (backend + frontend + E2E), voir le [README à la racine du repo](../README.md).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Commandes rapides
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm ci              # installer les dépendances
+npm run dev          # démarrer le serveur de dev (http://localhost:5173)
+npm test             # tests de composant (Vitest + React Testing Library)
+npm run lint          # Oxlint
+npm run build         # build de production (tsc + vite build)
+npm run test:e2e       # suite E2E Playwright (démarre aussi le backend)
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Stack
+
+- [Vite](https://vite.dev) + [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react) (SWC)
+- [Oxlint](https://oxc.rs) pour le lint — voir `.oxlintrc.json`
+- [Vitest](https://vitest.dev) + [Testing Library](https://testing-library.com/react) pour les tests de composant
+- [Playwright](https://playwright.dev) pour les tests E2E (`e2e/`)
