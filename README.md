@@ -110,6 +110,21 @@ npm run lint
 npm run build
 ```
 
+### Tests E2E
+
+Playwright pilote un vrai navigateur contre le frontend **et** le backend démarrés ensemble (voir `frontend/playwright.config.ts` — build + preview du frontend, `mvn spring-boot:run` du backend, CORS ajusté automatiquement entre les deux). Depuis `frontend/`, avec `JAVA_HOME`/`PATH` positionnés comme pour le backend :
+
+```bash
+npx playwright install --with-deps chromium   # une seule fois
+npm run test:e2e
+```
+
+Si le port 8080 est occupé localement (cf. section backend), cibler un autre port :
+
+```bash
+BACKEND_PORT=8082 npm run test:e2e
+```
+
 ### Lancer l'application
 
 Le backend doit tourner (voir ci-dessus) et autoriser l'origine du frontend en CORS — configurable via `MEDHEAD_CORS_ALLOWED_ORIGINS` côté backend (défaut : `http://localhost:5173`, l'origine du serveur de dev Vite).
@@ -132,6 +147,8 @@ VITE_API_BASE_URL=http://localhost:8082
 `.github/workflows/ci-backend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `backend/**`. Exécute `mvn -B verify` (JDK 25 Temurin) depuis `backend/`.
 
 `.github/workflows/ci-frontend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `frontend/**`. Exécute `npm ci`, `npm run lint`, `npm test`, `npm run build` (Node 22) depuis `frontend/`.
+
+`.github/workflows/ci-e2e.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `backend/**` ou `frontend/**`. Démarre le backend et le frontend ensemble et exécute la suite Playwright (`npm run test:e2e`) — le dernier étage de la pyramide de tests exigée par la PoC.
 
 Une PR ne peut pas être mergée si l'un de ces jobs échoue.
 
