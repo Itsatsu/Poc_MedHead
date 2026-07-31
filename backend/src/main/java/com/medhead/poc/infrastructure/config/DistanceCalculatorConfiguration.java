@@ -13,6 +13,12 @@ import org.springframework.web.client.RestClient;
 import java.time.Clock;
 import java.time.Duration;
 
+/**
+ * Assemble l'implémentation du port {@link DistanceCalculator} injectée dans le domaine :
+ * Google Maps comme calculateur primaire, Haversine comme secours, protégés par un
+ * disjoncteur. C'est ici, en infrastructure, que la topologie de résilience est câblée
+ * ; le domaine ne voit qu'un simple {@link DistanceCalculator}.
+ */
 @Configuration
 public class DistanceCalculatorConfiguration {
 

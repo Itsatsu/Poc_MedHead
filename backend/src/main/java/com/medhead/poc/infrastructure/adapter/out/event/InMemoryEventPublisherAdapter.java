@@ -10,11 +10,19 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Adaptateur de sortie (hexagonal) implémentant {@link EventPublisher} sans file de
+ * messages externe : les événements sont simplement journalisés et conservés en mémoire.
+ * Suffisant pour ce POC ; une architecture cible remplacerait cet adaptateur par une
+ * implémentation Kafka/RabbitMQ sans toucher au domaine.
+ */
 @Component
 public class InMemoryEventPublisherAdapter implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryEventPublisherAdapter.class);
 
+    // CopyOnWriteArrayList : lectures (tests, inspection) potentiellement concurrentes
+    // avec les écritures issues des requêtes HTTP.
     private final List<BedReservationEvent> publishedEvents = new CopyOnWriteArrayList<>();
 
     @Override

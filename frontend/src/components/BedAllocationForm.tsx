@@ -2,6 +2,10 @@ import { useState, type FormEvent } from 'react';
 import { allocateBed, BedAllocationApiError, type BedAllocationResult } from '../api/bedAllocationApi';
 import { NHS_SPECIALTIES } from '../domain/nhsSpecialties';
 
+/**
+ * Formulaire d'allocation de lit d'urgence : saisie de la spécialité NHS et des coordonnées
+ * du patient, appel de l'API backend, puis affichage de l'hôpital retenu ou d'une erreur.
+ */
 export function BedAllocationForm() {
   const [specialty, setSpecialty] = useState('');
   const [latitude, setLatitude] = useState('');
@@ -15,6 +19,9 @@ export function BedAllocationForm() {
     setResult(null);
     setError(null);
 
+    // Validation côté client : évite un aller-retour réseau inutile pour des champs
+    // vides ou des coordonnées non numériques. Le backend reste la source de vérité
+    // (validation stricte des spécialités et bornes GPS côté serveur).
     const parsedLatitude = Number(latitude);
     const parsedLongitude = Number(longitude);
     if (specialty === '' || latitude === '' || longitude === ''
@@ -91,6 +98,8 @@ export function BedAllocationForm() {
           </p>
           <p>
             Distance : {result.distanceKm.toFixed(1)} km
+            {/* "reelle" = calcul Google Maps Routes API, sinon estimation à vol d'oiseau
+                (fallback appliqué côté backend si l'API externe est indisponible). */}
             {' '}({result.precision === 'reelle' ? 'distance réelle' : 'estimation'})
           </p>
         </div>

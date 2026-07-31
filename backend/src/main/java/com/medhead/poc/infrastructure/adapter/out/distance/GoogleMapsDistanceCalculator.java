@@ -6,6 +6,12 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
+/**
+ * Adaptateur de sortie (hexagonal) implémentant {@link DistanceCalculator} via l'API
+ * Google Maps Routes (distance routière réelle en voiture). Utilisé comme calculateur
+ * primaire par {@link ResilientDistanceCalculator}, avec repli automatique en cas
+ * d'échec (clé API absente, quota dépassé, service indisponible, etc.).
+ */
 public class GoogleMapsDistanceCalculator implements DistanceCalculator {
 
     private static final String COMPUTE_ROUTES_URI = "https://routes.googleapis.com/directions/v2:computeRoutes";
@@ -42,6 +48,8 @@ public class GoogleMapsDistanceCalculator implements DistanceCalculator {
             throw new DistanceCalculationException("Google Maps Routes API returned no route");
         }
 
+        // On ne retient que le premier itinéraire proposé (le plus pertinent selon
+        // Google) ; distanceMeters est convertie en km pour homogénéité avec le domaine.
         double km = response.routes().get(0).distanceMeters() / 1000.0;
         return new Distance(km, "reelle");
     }

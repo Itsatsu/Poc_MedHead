@@ -17,6 +17,13 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+/**
+ * Cas d'usage central du domaine (couche "application" de l'architecture hexagonale) :
+ * alloue le lit d'urgence le plus proche parmi les hôpitaux disposant à la fois de la
+ * spécialité NHS demandée et d'un lit libre. Ne dépend que des ports du domaine
+ * ({@link HospitalRepository}, {@link DistanceCalculator}, {@link EventPublisher}),
+ * jamais des adaptateurs concrets.
+ */
 public class AllocateBedUseCase {
 
     private final HospitalRepository hospitalRepository;
@@ -43,22 +50,30 @@ public class AllocateBedUseCase {
 
         List<Hospital> hospitals = hospitalRepository.findAll();
 
+        // Un hôpital n'est éligible que s'il propose la spécialité ET a au moins un lit
+        // libre ; parmi les éligibles, on retient le plus proche (distance minimale).
         Hospital hospital = nearest(hospitals.stream()
                 .filter(h -> hasSpecialty(h, request.specialty()))
                 .filter(h -> h.availableBeds() > 0), request)
                 .orElseThrow(() -> new NoHospitalAvailableException(
                         "No hospital with an available bed and specialty: " + request.specialty()));
 
+        // La réservation du lit elle-même n'est pas modélisée ici (POC) : on se contente
+        // de publier l'événement métier signalant l'allocation.
         eventPublisher.publish(new BedReservationEvent(
                 UUID.randomUUID(), hospital.id(), request.specialty(), Instant.now()));
         return toResult(hospital, request);
     }
 
     private boolean hasSpecialty(Hospital hospital, String specialty) {
+        // Comparaison insensible à la casse, comme pour NhsSpecialty.isValid.
         return hospital.specialties().stream().anyMatch(s -> s.equalsIgnoreCase(specialty));
     }
 
     private Optional<Hospital> nearest(Stream<Hospital> hospitals, BedAllocationRequest request) {
+        // Attention : distanceTo() est appelé une fois par hôpital candidat pour la
+        // comparaison, ce qui peut déclencher plusieurs appels au calculateur de distance
+        // (potentiellement Google Maps) avant de retenir le plus proche.
         return hospitals.min(Comparator.comparingDouble(h -> distanceTo(h, request).km()));
     }
 

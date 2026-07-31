@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Adaptateur d'entrée (hexagonal) exposant le cas d'usage {@link AllocateBedUseCase}
+ * via une API REST. Traduit les DTO HTTP en modèles du domaine et les exceptions
+ * métier en codes de statut HTTP.
+ */
 @RestController
 public class BedAllocationController {
 
@@ -23,6 +28,9 @@ public class BedAllocationController {
 
     @PostMapping("/api/bed-allocations")
     public BedAllocationResponseDto allocate(@RequestBody BedAllocationRequestDto requestDto) {
+        // Validation de présence des champs au niveau adaptateur (types wrapper nullables
+        // dans le DTO) ; la validation métier (spécialité connue, coordonnées valides)
+        // est déléguée au domaine dans AllocateBedUseCase.
         if (requestDto.latitude() == null || requestDto.longitude() == null
                 || requestDto.specialty() == null) {
             throw new InvalidBedAllocationRequestException(
