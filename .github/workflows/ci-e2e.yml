@@ -12,10 +12,19 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - '.github/workflows/ci-e2e.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -42,9 +51,27 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Get installed Playwright version
+        id: playwright-version
+        working-directory: frontend
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: frontend
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright OS dependencies only
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: frontend
+        run: npx playwright install-deps chromium
 
       - name: Run E2E tests
         working-directory: frontend
