@@ -156,7 +156,7 @@ Trois workflows indépendants, chacun filtré par `paths` pour ne se déclencher
 
 `.github/workflows/ci-frontend.yml` : déclenché sur push vers `main` et sur toute PR qui touche `frontend/**`. Exécute `npm ci`, `npm run lint`, `npm run test:coverage`, `npm run build` (Node 22), upload le build (`dist/`) comme artefact, puis lance l'analyse **SonarQube** (`medhead-frontend`).
 
-`.github/workflows/ci-e2e.yml` : déclenché sur push vers `main` et sur toute PR qui touche `backend/**` ou `frontend/**`. Démarre le backend et le frontend ensemble et exécute la suite Playwright (`npm run test:e2e`) — le dernier étage de la pyramide de tests exigée par la PoC.
+`.github/workflows/ci-e2e.yml` : déclenché sur push vers `main` et sur toute PR qui touche `backend/**` ou `frontend/**`. Démarre le backend et le frontend ensemble et exécute la suite Playwright (`npm run test:e2e`) — le dernier étage de la pyramide de tests exigée par la PoC. Les navigateurs Playwright sont mis en cache (`~/.cache/ms-playwright`, clé basée sur la version de `@playwright/test`) pour éviter de retélécharger Chromium à chaque run.
 
 `.github/dependabot.yml` : met à jour automatiquement chaque semaine les dépendances Maven, npm et les Actions GitHub via des PR dédiées.
 
