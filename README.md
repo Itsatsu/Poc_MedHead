@@ -103,7 +103,13 @@ npm ci
 npm test
 ```
 
-Tests de composant (Vitest + React Testing Library), `fetch` mocké — aucun appel réel au backend. Pour le lint et le build :
+Tests de composant (Vitest + React Testing Library), `fetch` mocké — aucun appel réel au backend. Avec couverture (`coverage/lcov.info`, utilisé par SonarQube) :
+
+```bash
+npm run test:coverage
+```
+
+Pour le lint et le build :
 
 ```bash
 npm run lint
@@ -144,13 +150,26 @@ VITE_API_BASE_URL=http://localhost:8082
 
 ## Pipeline CI/CD
 
-`.github/workflows/ci-backend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `backend/**`. Exécute `mvn -B verify` (JDK 25 Temurin) depuis `backend/`.
+Trois workflows indépendants, chacun filtré par `paths` pour ne se déclencher que si son périmètre est touché, avec `concurrency` (annule les runs obsolètes du même ref) et `workflow_dispatch` (déclenchement manuel possible depuis l'onglet Actions) :
 
-`.github/workflows/ci-frontend.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `frontend/**`. Exécute `npm ci`, `npm run lint`, `npm test`, `npm run build` (Node 22) depuis `frontend/`.
+`.github/workflows/ci-backend.yml` : déclenché sur push vers `main` et sur toute PR qui touche `backend/**`. Exécute `mvn -B verify` (JDK 25 Temurin, couverture Jacoco), package le jar, l'upload comme artefact avec les rapports de test, puis lance l'analyse **SonarQube** (`medhead-backend`).
 
-`.github/workflows/ci-e2e.yml` : déclenché sur push vers `main` et sur toute Pull Request qui touche `backend/**` ou `frontend/**`. Démarre le backend et le frontend ensemble et exécute la suite Playwright (`npm run test:e2e`) — le dernier étage de la pyramide de tests exigée par la PoC.
+`.github/workflows/ci-frontend.yml` : déclenché sur push vers `main` et sur toute PR qui touche `frontend/**`. Exécute `npm ci`, `npm run lint`, `npm run test:coverage`, `npm run build` (Node 22), upload le build (`dist/`) comme artefact, puis lance l'analyse **SonarQube** (`medhead-frontend`).
+
+`.github/workflows/ci-e2e.yml` : déclenché sur push vers `main` et sur toute PR qui touche `backend/**` ou `frontend/**`. Démarre le backend et le frontend ensemble et exécute la suite Playwright (`npm run test:e2e`) — le dernier étage de la pyramide de tests exigée par la PoC.
+
+`.github/dependabot.yml` : met à jour automatiquement chaque semaine les dépendances Maven, npm et les Actions GitHub via des PR dédiées.
 
 Une PR ne peut pas être mergée si l'un de ces jobs échoue.
+
+### Configuration SonarQube requise
+
+L'analyse Sonar (self-hosted) a besoin de deux secrets de repo (`Settings > Secrets and variables > Actions`) :
+
+- `SONAR_HOST_URL` — URL du serveur SonarQube.
+- `SONAR_TOKEN` — jeton d'authentification (token utilisateur ou token de projet Sonar).
+
+Sans ces secrets, l'étape Sonar échoue ; sur les PR venant d'un fork externe, elle est automatiquement ignorée (le token ne doit pas être exposé à du code externe).
 
 ## Workflow Git
 

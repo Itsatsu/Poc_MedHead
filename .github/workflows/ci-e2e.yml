@@ -12,10 +12,19 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - '.github/workflows/ci-e2e.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
